@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://rural.alexandrepuchettiadv.com.br/sitemap.xml
+Sitemap: https://alexandrepuchettiadv.com.br/sitemap.xml

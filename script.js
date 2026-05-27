@@ -1,27 +1,55 @@
+const body = document.body;
+const preloader = document.querySelector(".preloader");
 const header = document.querySelector(".site-header");
 const menuButton = document.querySelector(".menu-toggle");
 const navLinks = document.querySelectorAll(".nav-links a");
 const revealItems = document.querySelectorAll(".reveal");
-const observedSections = document.querySelectorAll("main section[id]");
+const counters = document.querySelectorAll("[data-counter]");
+const sections = document.querySelectorAll("main section[id]");
+const carousel = document.querySelector(".area-carousel");
 
 let lastScrollY = window.scrollY;
 
+body.classList.add("loading");
+
 function updateHeader() {
     const currentScroll = window.scrollY;
-
-    header.classList.toggle("scrolled", currentScroll > 16);
-    header.classList.toggle("hidden", currentScroll > lastScrollY && currentScroll > 520);
-
+    header.classList.toggle("scrolled", currentScroll > 18);
+    header.classList.toggle("hidden", currentScroll > lastScrollY && currentScroll > 560);
     lastScrollY = currentScroll;
 }
 
 function closeMenu() {
-    document.body.classList.remove("menu-open");
+    body.classList.remove("menu-open");
     menuButton.setAttribute("aria-expanded", "false");
 }
 
+function animateCounter(counter) {
+    if (counter.dataset.animated === "true") {
+        return;
+    }
+
+    counter.dataset.animated = "true";
+
+    const target = Number(counter.dataset.counter);
+    const duration = 1400;
+    const start = performance.now();
+
+    function tick(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        counter.textContent = Math.round(target * eased).toLocaleString("pt-BR");
+
+        if (progress < 1) {
+            requestAnimationFrame(tick);
+        }
+    }
+
+    requestAnimationFrame(tick);
+}
+
 menuButton.addEventListener("click", () => {
-    const isOpen = document.body.classList.toggle("menu-open");
+    const isOpen = body.classList.toggle("menu-open");
     menuButton.setAttribute("aria-expanded", String(isOpen));
 });
 
@@ -39,15 +67,29 @@ const revealObserver = new IntersectionObserver(
         });
     },
     {
-        threshold: 0.16,
+        threshold: 0.14,
         rootMargin: "0px 0px -70px 0px",
     }
 );
 
 revealItems.forEach((item, index) => {
-    item.style.transitionDelay = `${Math.min(index * 55, 220)}ms`;
+    item.style.transitionDelay = `${Math.min(index * 42, 220)}ms`;
     revealObserver.observe(item);
 });
+
+const counterObserver = new IntersectionObserver(
+    (entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                animateCounter(entry.target);
+                counterObserver.unobserve(entry.target);
+            }
+        });
+    },
+    { threshold: 0.5 }
+);
+
+counters.forEach((counter) => counterObserver.observe(counter));
 
 const sectionObserver = new IntersectionObserver(
     (entries) => {
@@ -60,12 +102,52 @@ const sectionObserver = new IntersectionObserver(
             }
         });
     },
-    {
-        threshold: 0.42,
-    }
+    { threshold: 0.42 }
 );
 
-observedSections.forEach((section) => sectionObserver.observe(section));
+sections.forEach((section) => sectionObserver.observe(section));
+
+if (carousel) {
+    const track = carousel.querySelector(".area-track");
+    const cards = Array.from(carousel.querySelectorAll(".area-row"));
+    const prev = carousel.querySelector(".carousel-prev");
+    const next = carousel.querySelector(".carousel-next");
+    const dots = carousel.querySelector(".carousel-dots");
+
+    cards.forEach((_, index) => {
+        const dot = document.createElement("button");
+        dot.type = "button";
+        dot.setAttribute("aria-label", `Ir para área ${index + 1}`);
+        dot.addEventListener("click", () => {
+            cards[index].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+        });
+        dots.appendChild(dot);
+    });
+
+    const dotButtons = Array.from(dots.querySelectorAll("button"));
+
+    function updateDots() {
+        const trackLeft = track.getBoundingClientRect().left;
+        const currentIndex = cards.reduce((closest, card, index) => {
+            const distance = Math.abs(card.getBoundingClientRect().left - trackLeft);
+            return distance < closest.distance ? { index, distance } : closest;
+        }, { index: 0, distance: Number.POSITIVE_INFINITY }).index;
+
+        dotButtons.forEach((dot, index) => {
+            dot.classList.toggle("active", index === currentIndex);
+        });
+    }
+
+    function scrollByCard(direction) {
+        const cardWidth = cards[0].getBoundingClientRect().width + 16;
+        track.scrollBy({ left: cardWidth * direction, behavior: "smooth" });
+    }
+
+    prev.addEventListener("click", () => scrollByCard(-1));
+    next.addEventListener("click", () => scrollByCard(1));
+    track.addEventListener("scroll", updateDots, { passive: true });
+    updateDots();
+}
 
 document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -74,4 +156,20 @@ document.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("scroll", updateHeader, { passive: true });
-window.addEventListener("load", updateHeader);
+
+window.addEventListener("load", () => {
+    updateHeader();
+
+    setTimeout(() => {
+        preloader.classList.add("hidden");
+        body.classList.remove("loading");
+    }, 520);
+
+    setTimeout(() => {
+        counters.forEach((counter) => {
+            if (counter.textContent.trim() === "0") {
+                animateCounter(counter);
+            }
+        });
+    }, 1200);
+});
