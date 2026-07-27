@@ -113,23 +113,34 @@ if (carousel) {
     const prev = carousel.querySelector(".carousel-prev");
     const next = carousel.querySelector(".carousel-next");
     const dots = carousel.querySelector(".carousel-dots");
+    let scrollPositions = [];
 
-    cards.forEach((_, index) => {
-        const dot = document.createElement("button");
-        dot.type = "button";
-        dot.setAttribute("aria-label", `Ir para área ${index + 1}`);
-        dot.addEventListener("click", () => {
-            cards[index].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+    function createDots() {
+        const maxScroll = Math.max(track.scrollWidth - track.clientWidth, 0);
+        scrollPositions = cards
+            .map((card) => card.offsetLeft)
+            .filter((position) => position <= maxScroll + 8)
+            .filter((position, index, list) => index === 0 || Math.abs(position - list[index - 1]) > 8);
+
+        dots.innerHTML = "";
+
+        scrollPositions.forEach((_, index) => {
+            const dot = document.createElement("button");
+            dot.type = "button";
+            dot.setAttribute("aria-label", `Ir para posição ${index + 1} do carrossel`);
+            dot.addEventListener("click", () => {
+                track.scrollTo({ left: scrollPositions[index], behavior: "smooth" });
+            });
+            dots.appendChild(dot);
         });
-        dots.appendChild(dot);
-    });
 
-    const dotButtons = Array.from(dots.querySelectorAll("button"));
+        updateDots();
+    }
 
     function updateDots() {
-        const trackLeft = track.getBoundingClientRect().left;
-        const currentIndex = cards.reduce((closest, card, index) => {
-            const distance = Math.abs(card.getBoundingClientRect().left - trackLeft);
+        const dotButtons = Array.from(dots.querySelectorAll("button"));
+        const currentIndex = scrollPositions.reduce((closest, position, index) => {
+            const distance = Math.abs(track.scrollLeft - position);
             return distance < closest.distance ? { index, distance } : closest;
         }, { index: 0, distance: Number.POSITIVE_INFINITY }).index;
 
@@ -139,14 +150,19 @@ if (carousel) {
     }
 
     function scrollByCard(direction) {
-        const cardWidth = cards[0].getBoundingClientRect().width + 16;
-        track.scrollBy({ left: cardWidth * direction, behavior: "smooth" });
+        const currentIndex = scrollPositions.reduce((closest, position, index) => {
+            const distance = Math.abs(track.scrollLeft - position);
+            return distance < closest.distance ? { index, distance } : closest;
+        }, { index: 0, distance: Number.POSITIVE_INFINITY }).index;
+        const nextIndex = Math.min(Math.max(currentIndex + direction, 0), scrollPositions.length - 1);
+        track.scrollTo({ left: scrollPositions[nextIndex], behavior: "smooth" });
     }
 
     prev.addEventListener("click", () => scrollByCard(-1));
     next.addEventListener("click", () => scrollByCard(1));
     track.addEventListener("scroll", updateDots, { passive: true });
-    updateDots();
+    window.addEventListener("resize", createDots);
+    createDots();
 }
 
 document.addEventListener("keydown", (event) => {
